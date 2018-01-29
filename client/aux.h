@@ -2,6 +2,7 @@
 
 // Variables //
 int count_w;
+
 int CLIENT_PORT;
 int SERVER_PORT;
 char CLIENT_IP[20];

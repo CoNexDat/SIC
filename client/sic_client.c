@@ -193,6 +193,7 @@ int create_socket()
     // Set client parameters //
 	memset(&local_addr, 0, sizeof(struct sockaddr_in));
 	local_addr.sin_family = AF_INET;
+
 	local_addr.sin_port = htons(CLIENT_PORT);
 	local_addr.sin_addr.s_addr = inet_addr(CLIENT_IP);
 	
@@ -357,6 +358,7 @@ sic_data send_sic_packet(void)
 	// Time to wait response //
 	tv.tv_sec=0;
 	tv.tv_usec=TIMEOUT;
+
 	/* Receive server response */
 	receive = select(numfd, &readfds,NULL,NULL,&tv);
     switch (receive) 
