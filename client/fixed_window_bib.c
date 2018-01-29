@@ -1,3 +1,23 @@
+
+//
+//   fixed_window_bib.c is part of SIC.
+//
+//   Copyright (C) 2018  your name
+//
+//   SIC is free software: you can redistribute it and/or modify
+//   it under the terms of the GNU General Public License as published by
+//   the Free Software Foundation, either version 3 of the License, or
+//   (at your option) any later version.
+//
+//   SIC is distributed in the hope that it will be useful,
+//   but WITHOUT ANY WARRANTY; without even the implied warranty of
+//   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//   GNU General Public License for more details.
+//
+//   You should have received a copy of the GNU General Public License
+//   along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+//
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -21,19 +41,14 @@ double fixed_window_read(fixed_window *fw, int index)
 
 int fixed_window_Hread(fixed_window *fw, int h, double *data)
 {
-	// h = 0 last, h = 1 first
-	// Correcion h = 0 first, h = 1 last
 	int i, start,end;
 	
 	if( h<0 || h>1 )
 		return -1; //No valid parameter h 
 	else 
 	{
-		//start=indice-1-(size/2)+(h+2)*size/2
-		//end=indice-2+(h+2)*size/2+1
 		start = fw->index-1 - (fw->size/2)+ 1 +( (h+2)*fw->size/2 );
 		end   = fw->index-1 + ( (h+2)*fw->size/2 );
-		//printf("Start %d End %d ----index %d\n", start, end,fw->index);
 		for(i=start; i <= end; i++)
 			data[i-start]=fw->w[i % fw->size];
 	}
