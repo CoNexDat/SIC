@@ -1,3 +1,22 @@
+//
+//   sic_server.c is part of SIC.
+//
+//   Copyright (C) 2018  your name
+//
+//   SIC is free software: you can redistribute it and/or modify
+//   it under the terms of the GNU General Public License as published by
+//   the Free Software Foundation, either version 3 of the License, or
+//   (at your option) any later version.
+//
+//   SIC is distributed in the hope that it will be useful,
+//   but WITHOUT ANY WARRANTY; without even the implied warranty of
+//   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+//   GNU General Public License for more details.
+//
+//   You should have received a copy of the GNU General Public License
+//   along with Foobar.  If not, see <http://www.gnu.org/licenses/>.
+//
+
 #include <unistd.h>
 #include <stdio.h>
 #include <sys/socket.h>
@@ -18,20 +37,17 @@ int start_values()
 	char aux_line[50];
 	size_t len;
 	char *token;
+	FILE* finput;	
 	
-	/** File path **/
+	// File path //
 	getcwd(file_path, sizeof(file_path));
 	strcat(file_path,"/");
-	
-	/** Read configuration file**/
+	// Read configuration file //
 	strcpy(config,"config.conf");
 	strcpy(file_config,file_path);
 	strcat(file_config,config);	
-
-	FILE* finput;
 	finput = fopen(file_config, "rt");
     select_option=0;
-    
     while(!feof(finput))
     {
         fgets(aux_line, 50, finput);
@@ -70,7 +86,7 @@ long long int get_timestamp ()
 {
 	struct timeval timer_usec; 
 	
-	long long int timestamp_usec; /* timestamp in microseconds */
+	long long int timestamp_usec; // timestamp in microseconds //
 	if (!gettimeofday(&timer_usec, NULL)) 
 	{
 		timestamp_usec = ((long long int) timer_usec.tv_sec) * 1000000ll + (long long int) timer_usec.tv_usec;
@@ -86,7 +102,7 @@ long long int get_timestamp ()
 int create_socket()
 {
 	
-	/** Configure settings in address struct **/
+	// Configure settings in address struct //
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(src_port);
 	serverAddr.sin_addr.s_addr = inet_addr(src_ip);
@@ -111,25 +127,18 @@ int create_socket()
 
 void wait_connections()
 {
-	int nBytes;
-
+	int nBytes, i;
 	struct sockaddr_storage serverStorage;
-	
 	socklen_t addr_size, client_addr_size;
-	int i;
 	long long int t2;
 	long long int t3;
-	
 	char t2_str[17];
     char t2_pps_str[17];
 	char t3_str[17];
-
 	char chain_tx[67];
 	char chain_rx[67];	
 
-	/*Initialize size variable to be used later on*/
 	addr_size = sizeof serverStorage;
-	
 	while(1){
 		nBytes = recvfrom(udpSocket,chain_rx,sizeof(chain_rx),0,(struct sockaddr *)&serverStorage, &addr_size);
 		t2=get_timestamp();
