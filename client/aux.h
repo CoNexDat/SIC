@@ -1,25 +1,22 @@
-/** Global variables and functions **/
+/** Global variables **/
 
-/* Variables */
+// Variables //
 int count_w;
-int src_port;
-int dst_port;
-char src_ip[20];
-char dst_ip[20];
-
-int MEDIAN_MAX_SIZE = 0;
+int CLIENT_PORT;
+int SERVER_PORT;
+char CLIENT_IP[20];
+char SERVER_IP[20];
+int MEDIAN_MAX_SIZE;
 int P = 0;
 double alpha;
 double err_RTT;
-int timeout=0;
+int TIMEOUT=0;
 double actual_m;
 double actual_c;
 
 bool synck=false;
 bool to=false;
 bool debug=false;
-bool w_median_flag=false;
-
 int pre_sync;
 int epoch_sync;
 int err_sync;
@@ -33,18 +30,7 @@ struct sockaddr_in local_addr;
 char file_path[100];
 char sync_values_txt[30];
 char sync_values_path[100];
-
 char config[30];
 char file_config[100];
 
 double t1_p=0, t2_p=0, t3_p=0, t4_p=0;
-
-/* Functions */
-int start_values();
-long long int get_timestamp ();
-void error(char* msg);
-double median(double *pv, int size);
-
-
-
-
