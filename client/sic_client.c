@@ -182,8 +182,8 @@ void error( char* msg )
     struct tm *tlocal = localtime(&tiempo);
     char output[128];
 	
-    strftime(output, 128, "%d-%m-%y %H:%M:%S -- ", tlocal);
-    strcat(output,msg);
+    strftime(output, sizeof(output), "%d-%m-%y %H:%M:%S -- ", tlocal);
+    strncat(output,msg,sizeof(output));
     perror( output );
 }
 
@@ -233,16 +233,16 @@ int start_values()
 
 	// File path //
 	getcwd(file_path, sizeof(file_path));
-	strcat(file_path,"/");
-	strcpy(config,"config.conf");
-	strcpy(file_config,file_path);
-	strcat(file_config,config);	
+	strncat(file_path,"/",sizeof(file_path));
+	strncpy(config,"config.conf",sizeof(config));
+	strncpy(file_config,file_path,sizeof(file_config));
+	strncat(file_config,config,sizeof(file_path));	
 	// Read configuration file //
 	finput = fopen(file_config, "rt");
     select_option=0;
     while(!feof(finput))
     {
-        fgets(aux_line, 50, finput);
+        fgets(aux_line, sizeof(aux_line), finput);
         token = strtok(aux_line, ":");
         token=strtok(NULL,"\0");
 		switch (select_option) 
@@ -256,13 +256,11 @@ int start_values()
 				select_option++;				
 				continue;				
 			case 2:
-				len = strlen(token)-1;
-				strncpy(CLIENT_IP,token,len);
+				strncpy(CLIENT_IP,token,sizeof(CLIENT_IP));
 				select_option++;
 				continue;				
 			case 3:
-				len = strlen(token)-1;
-				strncpy(SERVER_IP,token,len);
+				strncpy(SERVER_IP,token,sizeof(SERVER_IP));
 				select_option++;
 				continue;				
 			case 4:
@@ -289,9 +287,9 @@ int start_values()
 	
 	pre_sync=INT_MAX-P;
 	epoch_sync=INT_MAX-P;
-	strcat(sync_values_txt,"sync_values.dat");	
-	strcpy(sync_values_path,file_path);
-	strcat(sync_values_path,sync_values_txt);
+	strncat(sync_values_txt,"sync_values.dat",sizeof(sync_values_txt));
+	strncpy(sync_values_path,file_path,sizeof(sync_values_path));
+	strncat(sync_values_path,sync_values_txt,sizeof(sync_values_path));
 	save_syn_values("0.0","0.0","NOSYNC");
 
 	return 0;
@@ -331,9 +329,9 @@ sic_data send_sic_packet(void)
 	}
 	
 	t1=get_timestamp();  
-	sprintf(t1_str, "%lld", t1);	
-	strcpy(chain_tx,t1_str);
-	strcat(chain_tx,tx_str);	
+	snprintf(t1_str, sizeof(t1_str), "%lld", t1);	
+	strncpy(chain_tx,t1_str,sizeof(chain_tx));
+	strncat(chain_tx,tx_str,sizeof(chain_tx));
 	
 	// Send data to server //
 	if ( sendto(clientSocket,chain_tx,sizeof(chain_tx),0,(struct sockaddr *)&serverAddr,addr_size) < 0)
@@ -391,7 +389,7 @@ sic_data send_sic_packet(void)
 			{
 				// Get t4 //
 				t4=get_timestamp();
-				sprintf(t4_str, "%lld", t4);
+				snprintf(t4_str, sizeof(t4_str), "%lld", t4);
 				
 				nBytes = recvfrom(clientSocket,chain_rx,sizeof(chain_rx),0,NULL, NULL);
 				if (nBytes < 0)
@@ -501,8 +499,8 @@ void process(sic_data sic_receive, fixed_window *W_m, fixed_window *W_median, fi
 			actual_c=c;
 			actual_m=(1-alpha)*m+(actual_m*alpha);
 			epoch_sync = sic_receive.epoch;
-			sprintf(maux,"%lf",actual_m);
-			sprintf(caux,"%lf",actual_c);
+			snprintf(maux,sizeof(maux),"%lf",actual_m);
+			snprintf(caux,sizeof(caux),"%lf",actual_c);
 			save_syn_values(maux,caux, "SYNC");
 		}
 		else
@@ -521,8 +519,8 @@ void process(sic_data sic_receive, fixed_window *W_m, fixed_window *W_median, fi
 				epoch_sync = sic_receive.epoch;
 				actual_m = m;
 				actual_c = c;
-				sprintf(maux,"%lf",actual_m);
-				sprintf(caux,"%lf",actual_c);
+				snprintf(maux,sizeof(maux),"%lf",actual_m);
+				snprintf(caux,sizeof(caux),"%lf",actual_c);
 				save_syn_values(maux,caux, "PRESYNC");				
 			}
 		}	

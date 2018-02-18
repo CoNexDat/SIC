@@ -19,7 +19,7 @@ LINKS = -I/usr/local/include -L/usr/local/lib -lgsl -lgslcblas -lm
 
 all: sic_client
 
-sic_client:
+sic_client: sic_client.c
 	$(CC) $(CFLACS) $(BINARY) sic_client.c $(LINKS)
 
 clean:
