@@ -18,7 +18,7 @@ CFLACS = -o
 
 all: sic_server 
 
-sic_server:
+sic_server: sic_server.c
 	$(CC) $(CFLACS) $(BINARY) sic_server.c 
 clean:
 	rm -f $(BINARY) $(OBJECTS)

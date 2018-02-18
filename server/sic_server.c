@@ -41,16 +41,16 @@ int start_values()
 	
 	// File path //
 	getcwd(file_path, sizeof(file_path));
-	strcat(file_path,"/");
+	strncat(file_path,"/",sizeof(file_path));
 	// Read configuration file //
-	strcpy(config,"config.conf");
-	strcpy(file_config,file_path);
-	strcat(file_config,config);	
+	strncpy(config,"config.conf",sizeof(config));
+	strncpy(file_config,file_path,sizeof(file_config));
+	strncat(file_config,config,sizeof(file_config));
 	finput = fopen(file_config, "rt");
     select_option=0;
     while(!feof(finput))
     {
-        fgets(aux_line, 50, finput);
+        fgets(aux_line, sizeof(aux_line), finput);
         token = strtok(aux_line, ":");
         token=strtok(NULL,"\0");
 		switch (select_option) 
@@ -60,8 +60,7 @@ int start_values()
 				select_option++;
 				continue;				
 			case 1:
-				len = strlen(token)-1;
-				strncpy(src_ip,token,len);
+				strncpy(src_ip,token,sizeof(src_ip));
 				select_option++;
 				continue;						
 		}
@@ -77,8 +76,8 @@ void error( char* msg )
     struct tm *tlocal = localtime(&tiempo);
     char output[128];
 	
-    strftime(output, 128, "%d-%m-%y %H:%M:%S--", tlocal);
-    strcat(output,msg);
+    strftime(output, sizeof(output), "%d-%m-%y %H:%M:%S--", tlocal);
+    strncat(output,msg,sizeof(output));
     perror( output );	
 }
 
@@ -133,7 +132,7 @@ void wait_connections()
 	long long int t2;
 	long long int t3;
 	char t2_str[17];
-    char t2_pps_str[17];
+    	char t2_pps_str[17];
 	char t3_str[17];
 	char chain_tx[67];
 	char chain_rx[67];	
@@ -142,16 +141,16 @@ void wait_connections()
 	while(1){
 		nBytes = recvfrom(udpSocket,chain_rx,sizeof(chain_rx),0,(struct sockaddr *)&serverStorage, &addr_size);
 		t2=get_timestamp();
-		sprintf(t2_str, "%lld", t2);
-		strcpy(chain_tx, strtok(chain_rx,"|"));
-		strcat(chain_tx,"|");
-		strcat(chain_tx,t2_str);
-		strcat(chain_tx,"|");
+		snprintf(t2_str, sizeof(t2_str), "%lld", t2);
+		strncpy(chain_tx, strtok(chain_rx,"|"),sizeof(chain_tx));
+		strncat(chain_tx,"|",sizeof(chain_tx));
+		strncat(chain_tx,t2_str,sizeof(chain_tx));
+		strncat(chain_tx,"|",sizeof(chain_tx));
 		t3=get_timestamp();
-		sprintf(t3_str, "%lld", t3);
-		strcat(chain_tx,t3_str);
-		strcat(chain_tx,"|");
-		strcat(chain_tx,"0000000000000000");
+		snprintf(t3_str, sizeof(t3_str),"%lld", t3);
+		strncat(chain_tx,t3_str,sizeof(chain_tx));
+		strncat(chain_tx,"|",sizeof(chain_tx));
+		strncat(chain_tx,"0000000000000000",sizeof(chain_tx));
 		memset(chain_rx,'\0',strlen(chain_rx));
 		printf("%s\n",chain_tx);
 		sendto(udpSocket,chain_tx,sizeof(chain_tx),0,(struct sockaddr *)&serverStorage,addr_size);
