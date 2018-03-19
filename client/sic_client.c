@@ -41,6 +41,7 @@
 #include "fixed_window_bib.c"
 #include "aux.h"
 #include <unistd.h>
+#include <openssl/ecdsa.h>   // for ECDSA_do_sign, ECDSA_do_verify
 
 typedef struct  
 { 
@@ -51,6 +52,16 @@ typedef struct
 	long long int t4; 
 	bool to;
 } sic_data;
+
+
+#define PKEYFILE "clientPrivKey.pem"
+#define PBKEYFILE "clientPubKey.pem"
+#define SRVKEYFILE "serverPubKey.pem"
+
+EC_KEY *load_pub_key(char *PUBKEYFILE);
+EC_KEY *load_key(char *PRIVKEYFILE,char *PUBKEYFILE);
+EC_KEY *eckey; // private key
+EC_KEY *srvkey; // server public key
 
 // Function to control duplicate times //
 int validate(char t1[20], char t2[20], char t3[20], char t4[20])
@@ -300,7 +311,9 @@ sic_data send_sic_packet(void)
 {
 
 	char chain_tx[67];
-	char chain_rx[67];
+	char chain_rx[67+129];
+	static char chain_rx_old[67+129];
+	char sig_s[65],sig_r[65];
 	char tx_str[52]= "|0000000000000000|0000000000000000|0000000000000000";
 	char t1_str[17];
 	char t4_str[17];
@@ -312,6 +325,7 @@ sic_data send_sic_packet(void)
 	int nBytes, validation, numfd;
 	fd_set readfds;
 	struct timeval tv;
+	
 
 	if (flag_parameters == 0)
 		create_socket();	
@@ -414,7 +428,39 @@ sic_data send_sic_packet(void)
 								
 				// t3 //
 				for(i=34;i<51;i++)  t3_str_rec[i-34]=chain_rx[i];
-				t3_str_rec[16]= '\0';		
+				t3_str_rec[16]= '\0';
+
+				ECDSA_SIG sig;
+				// Validate signature
+				// sig.r
+				for(i=51;i<51+64;i++)  sig_r[i-51]=chain_rx[i];
+				sig_r[64]= '\0';
+				// sig.s
+				for(i=115;i<115+64;i++)  sig_s[i-115]=chain_rx[i];
+				sig_s[64]= '\0';
+				BIGNUM* r = BN_new();
+				BIGNUM* s = BN_new();
+				BN_hex2bn(&r, sig_r);
+				BN_hex2bn(&s, sig_s);
+				sig.s=s;
+				sig.r=r;
+				//printf("[Signature:] %s %s\n",sig_r,sig_s);
+				//printf("VErifying: %s\n",chain_rx_old);
+				if (strlen(chain_rx_old)>0) {
+				if (1 != ECDSA_do_verify(chain_rx_old, 50, &sig, srvkey)) {
+				        printf("Failed to verify EC Signature\n");
+					// reset sync because of failed signature
+					out.epoch=t1/1000000;
+					out.t1=t1;
+					out.t2=0;
+					out.t3=0;
+					out.t4=t4;
+					out.to=true;
+				} else {
+				        printf("Verified EC Signature\n");
+					}
+					}
+				strncpy(chain_rx_old,chain_rx,sizeof(chain_rx_old));
 				
 				// validate duplicate times //
 				validation=validate(t1_str, t2_str_rec, t3_str_rec, t4_str);
@@ -541,6 +587,13 @@ void main()
 	// Read config file //
 	start_values();
 	fflush(stdout);
+	eckey = load_key(PKEYFILE,PBKEYFILE);
+	srvkey= load_pub_key(SRVKEYFILE);
+	if (srvkey==NULL)
+	{
+		printf("Failed to load public key %s.\n",SRVKEYFILE);
+		exit(-1);
+	}
 
 	// Window for save medians //
 	fixed_window *W_m = fixed_window_init(MEDIAN_MAX_SIZE); 		

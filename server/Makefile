@@ -3,22 +3,22 @@
 #####################################################################
 
 OBJECTS = *.o
-BINARY = sic_server
+BINARY = -o sic_server
 
 ##################################################################### 
 #   Options 							#
 #####################################################################
 
 CC = gcc
-CFLACS = -o
+CFLACS = -g -lssl -UOPENSSL_NO_EC 
 
 ##################################################################### 
 #   Rules							#
 #####################################################################
 
-all: sic_server 
+all: sic_server
 
-sic_server: sic_server.c
-	$(CC) $(CFLACS) $(BINARY) sic_server.c 
+sic_server: sic_server.c ecdsa.c
+	$(CC) $(CFLACS) $(BINARY) ecdsa.c sic_server.c -lcrypto
 clean:
 	rm -f $(BINARY) $(OBJECTS)

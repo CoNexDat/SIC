@@ -24,12 +24,19 @@
 #include <string.h>
 #include <stdlib.h>
 #include <arpa/inet.h> 
-#include <stdlib.h>
 #include <ctype.h>
 #include <sys/time.h>
 #include <time.h>
 #include <sys/shm.h>
+#include <openssl/ecdsa.h>   // for ECDSA_do_sign, ECDSA_do_verify
+
 #include "aux.h"
+
+#define PKEYFILE "serverPrivKey.pem"
+#define PBKEYFILE "serverPubKey.pem"
+
+EC_KEY *load_key(char *PRIVKEYFILE,char *PUBKEYFILE);
+EC_KEY *eckey; // private key
 
 int start_values()
 {
@@ -105,7 +112,7 @@ int create_socket()
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(src_port);
 	serverAddr.sin_addr.s_addr = inet_addr(src_ip);
-	memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);  
+	memset(serverAddr.sin_zero, '\0', sizeof serverAddr.sin_zero);
 	addr_size = sizeof serverAddr;
 
 	udpSocket = socket(AF_INET, SOCK_DGRAM, 0);
@@ -134,8 +141,9 @@ void wait_connections()
 	char t2_str[17];
     	char t2_pps_str[17];
 	char t3_str[17];
-	char chain_tx[67];
-	char chain_rx[67];	
+	char chain_tx[67+129],chain_tx_old[67];
+	char chain_rx[67+129];
+	memset(chain_tx_old,0,sizeof(chain_tx_old));
 
 	addr_size = sizeof serverStorage;
 	while(1){
@@ -143,14 +151,19 @@ void wait_connections()
 		t2=get_timestamp();
 		snprintf(t2_str, sizeof(t2_str), "%lld", t2);
 		strncpy(chain_tx, strtok(chain_rx,"|"),sizeof(chain_tx));
+		// TODO: Verify client signature
 		strncat(chain_tx,"|",sizeof(chain_tx));
 		strncat(chain_tx,t2_str,sizeof(chain_tx));
 		strncat(chain_tx,"|",sizeof(chain_tx));
 		t3=get_timestamp();
 		snprintf(t3_str, sizeof(t3_str),"%lld", t3);
 		strncat(chain_tx,t3_str,sizeof(chain_tx));
+		// Sign the last packet message
+                ECDSA_SIG *signature = ECDSA_do_sign(chain_tx_old, strlen(chain_tx_old), eckey);
+		strncpy(chain_tx_old,chain_tx,sizeof(chain_tx_old));
 		strncat(chain_tx,"|",sizeof(chain_tx));
-		strncat(chain_tx,"0000000000000000",sizeof(chain_tx));
+		strncat(chain_tx,BN_bn2hex(signature->r),sizeof(chain_tx));
+		strncat(chain_tx,BN_bn2hex(signature->s),sizeof(chain_tx));
 		memset(chain_rx,'\0',strlen(chain_rx));
 		printf("%s\n",chain_tx);
 		sendto(udpSocket,chain_tx,sizeof(chain_tx),0,(struct sockaddr *)&serverStorage,addr_size);
@@ -161,6 +174,7 @@ void wait_connections()
 
 void main()
 {
+	eckey = load_key(PKEYFILE,PBKEYFILE);
 	start_values();
 	create_socket();
 	wait_connections();	
