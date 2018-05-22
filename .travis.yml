@@ -1,0 +1,9 @@
+dist: trusty
+sudo: false # only for faster builds
+language: c
+compiler: gcc
+script:
+  - cd client
+  - make clean all
+  - cd ../server
+  - make clean all
