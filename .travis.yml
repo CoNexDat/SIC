@@ -3,7 +3,7 @@ sudo: true
 language: c
 compiler: gcc
 before_install:
-  - sudo apt-get install libgsl0ldbl
+  - sudo apt-get install libgsl0-dev
 script:
   - cd client
   - make clean all
