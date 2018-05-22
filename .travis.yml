@@ -1,7 +1,9 @@
 dist: trusty
-sudo: false # only for faster builds
+sudo: true
 language: c
 compiler: gcc
+before_install:
+  - sudo apt-get install libgsl0ldbl
 script:
   - cd client
   - make clean all
