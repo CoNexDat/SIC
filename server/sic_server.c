@@ -34,9 +34,12 @@
 
 #define PKEYFILE "serverPrivKey.pem"
 #define PBKEYFILE "serverPubKey.pem"
+#define CLNTPUBKEYFILE "clientPubKey.pem"
 
 EC_KEY *load_key(char *PRIVKEYFILE,char *PUBKEYFILE);
-EC_KEY *eckey; // private key
+EC_KEY *load_pub_key(char *PUBKEYFILE);
+EC_KEY *eckey; // server private key
+EC_KEY *clntkey; // client public key
 
 int start_values()
 {
@@ -141,17 +144,39 @@ void wait_connections()
 	char t2_str[17];
     	char t2_pps_str[17];
 	char t3_str[17];
-	char chain_tx[67+129],chain_tx_old[67];
+	char sig_s[65],sig_r[65];
+	char chain_tx[67+129],chain_tx_old[67+129];
 	char chain_rx[67+129];
 	memset(chain_tx_old,0,sizeof(chain_tx_old));
 
 	addr_size = sizeof serverStorage;
 	while(1){
 		nBytes = recvfrom(udpSocket,chain_rx,sizeof(chain_rx),0,(struct sockaddr *)&serverStorage, &addr_size);
+		// Verify client signature
+		ECDSA_SIG sig;
+		// Validate signature
+		// sig.r
+		for(i=68;i<68+64;i++)  sig_r[i-68]=chain_rx[i];
+		sig_r[64]= '\0';
+		// sig.s
+		for(i=132;i<132+64;i++)  sig_s[i-132]=chain_rx[i];
+		sig_s[64]= '\0';
+		BIGNUM* r = BN_new();
+		BIGNUM* s = BN_new();
+		BN_hex2bn(&r, sig_r);
+		BN_hex2bn(&s, sig_s);
+		sig.s=s;
+		sig.r=r;
+		if (1 != ECDSA_do_verify(chain_rx, 67, &sig, clntkey)) {
+		        printf("Failed to verify Client EC Signature\n");
+			continue;
+		} else {
+		        printf("Verified Client EC Signature\n");
+			}
+
 		t2=get_timestamp();
 		snprintf(t2_str, sizeof(t2_str), "%lld", t2);
 		strncpy(chain_tx, strtok(chain_rx,"|"),sizeof(chain_tx));
-		// TODO: Verify client signature
 		strncat(chain_tx,"|",sizeof(chain_tx));
 		strncat(chain_tx,t2_str,sizeof(chain_tx));
 		strncat(chain_tx,"|",sizeof(chain_tx));
@@ -165,7 +190,6 @@ void wait_connections()
 		strncat(chain_tx,BN_bn2hex(signature->r),sizeof(chain_tx));
 		strncat(chain_tx,BN_bn2hex(signature->s),sizeof(chain_tx));
 		memset(chain_rx,'\0',strlen(chain_rx));
-		printf("%s\n",chain_tx);
 		sendto(udpSocket,chain_tx,sizeof(chain_tx),0,(struct sockaddr *)&serverStorage,addr_size);
 	}
 
@@ -175,6 +199,7 @@ void wait_connections()
 void main()
 {
 	eckey = load_key(PKEYFILE,PBKEYFILE);
+	clntkey = load_pub_key(CLNTPUBKEYFILE);
 	start_values();
 	create_socket();
 	wait_connections();	

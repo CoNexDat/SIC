@@ -3,7 +3,7 @@
 #####################################################################
 
 OBJECTS = sic_client.o 
-BINARY = -o sic_client
+BINARY = sic_client
 
 ##################################################################### 
 #   Options            					            #
@@ -20,7 +20,7 @@ LINKS = -I/usr/local/include -L/usr/local/lib -lgsl -lgslcblas -lm -lcrypto
 all: sic_client
 
 sic_client: sic_client.c ../server/ecdsa.c
-	$(CC) $(CFLACS) $(BINARY) ../server/ecdsa.c sic_client.c $(LINKS)
+	$(CC) $(CFLACS) -o $(BINARY) ../server/ecdsa.c sic_client.c $(LINKS)
 
 clean:
 	rm -f $(BINARY) $(OBJECTS)

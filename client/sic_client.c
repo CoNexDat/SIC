@@ -53,7 +53,6 @@ typedef struct
 	bool to;
 } sic_data;
 
-
 #define PKEYFILE "clientPrivKey.pem"
 #define PBKEYFILE "clientPubKey.pem"
 #define SRVKEYFILE "serverPubKey.pem"
@@ -310,7 +309,7 @@ int start_values()
 sic_data send_sic_packet(void)
 {
 
-	char chain_tx[67];
+	char chain_tx[67+129];
 	char chain_rx[67+129];
 	static char chain_rx_old[67+129];
 	char sig_s[65],sig_r[65];
@@ -325,7 +324,6 @@ sic_data send_sic_packet(void)
 	int nBytes, validation, numfd;
 	fd_set readfds;
 	struct timeval tv;
-	
 
 	if (flag_parameters == 0)
 		create_socket();	
@@ -346,9 +344,13 @@ sic_data send_sic_packet(void)
 	snprintf(t1_str, sizeof(t1_str), "%lld", t1);	
 	strncpy(chain_tx,t1_str,sizeof(chain_tx));
 	strncat(chain_tx,tx_str,sizeof(chain_tx));
-	
+	// Sign the last packet message
+        ECDSA_SIG *signature = ECDSA_do_sign(chain_tx, strlen(chain_tx), eckey);
+	strncat(chain_tx,"|",sizeof(chain_tx));
+	strncat(chain_tx,BN_bn2hex(signature->r),sizeof(chain_tx));
+	strncat(chain_tx,BN_bn2hex(signature->s),sizeof(chain_tx));
 	// Send data to server //
-	if ( sendto(clientSocket,chain_tx,sizeof(chain_tx),0,(struct sockaddr *)&serverAddr,addr_size) < 0)
+	if ( (i=sendto(clientSocket,chain_tx,sizeof(chain_tx),0,(struct sockaddr *)&serverAddr,addr_size)) < 0)
 	{
 		close(clientSocket);
 		error( "Error: sentto");
@@ -360,7 +362,6 @@ sic_data send_sic_packet(void)
 		out.t4=0;
 		to=true;
 	}	
-	
 	// Set socket no block //
 	flags = fcntl(clientSocket, F_GETFL, 0);
 	fcntl(clientSocket, F_SETFL, flags | O_NONBLOCK);
@@ -431,7 +432,7 @@ sic_data send_sic_packet(void)
 				t3_str_rec[16]= '\0';
 
 				ECDSA_SIG sig;
-				// Validate signature
+				// Validate server signature
 				// sig.r
 				for(i=51;i<51+64;i++)  sig_r[i-51]=chain_rx[i];
 				sig_r[64]= '\0';
@@ -444,11 +445,9 @@ sic_data send_sic_packet(void)
 				BN_hex2bn(&s, sig_s);
 				sig.s=s;
 				sig.r=r;
-				//printf("[Signature:] %s %s\n",sig_r,sig_s);
-				//printf("VErifying: %s\n",chain_rx_old);
 				if (strlen(chain_rx_old)>0) {
-				if (1 != ECDSA_do_verify(chain_rx_old, 50, &sig, srvkey)) {
-				        printf("Failed to verify EC Signature\n");
+				if (1 != ECDSA_do_verify(chain_rx_old, 67, &sig, srvkey)) {
+				        printf("Failed to verify Server EC Signature\n");
 					// reset sync because of failed signature
 					out.epoch=t1/1000000;
 					out.t1=t1;
@@ -457,7 +456,7 @@ sic_data send_sic_packet(void)
 					out.t4=t4;
 					out.to=true;
 				} else {
-				        printf("Verified EC Signature\n");
+				        printf("Verified Server EC Signature\n");
 					}
 					}
 				strncpy(chain_rx_old,chain_rx,sizeof(chain_rx_old));
