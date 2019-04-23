@@ -1,26 +1,26 @@
 ##################################################################### 
-#   Variables				  			                            #
+#   Variables				  			    #
 #####################################################################
 
 OBJECTS = sic_client.o 
 BINARY = sic_client
 
 ##################################################################### 
-#   Options            					                            #
+#   Options            					            #
 #####################################################################
 
 CC = gcc
-CFLACS = -g -std=gnu99 -o
-LINKS = -I/usr/local/include -L/usr/local/lib -lgsl -lgslcblas -lm
+CFLACS = -g -std=gnu99 -lssl -UOPENSSL_NO_EC 
+LINKS = -I/usr/local/include -L/usr/local/lib -lgsl -lgslcblas -lm -lcrypto
 
 ##################################################################### 
-#   Rules   				  			                            #
+#   Rules   				  			    #
 #####################################################################
 
 all: sic_client
 
-sic_client: sic_client.c
-	$(CC) $(CFLACS) $(BINARY) sic_client.c $(LINKS)
+sic_client: sic_client.c ../server/ecdsa.c
+	$(CC) $(CFLACS) -o $(BINARY) ../server/ecdsa.c sic_client.c $(LINKS)
 
 clean:
 	rm -f $(BINARY) $(OBJECTS)
