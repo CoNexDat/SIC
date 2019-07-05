@@ -29,7 +29,7 @@
 #include <time.h>
 #include <sys/shm.h>
 #include <openssl/ecdsa.h>   // for ECDSA_do_sign, ECDSA_do_verify
-
+#include "../server/ntp-packet.h"
 #include "aux.h"
 
 #define PKEYFILE "serverPrivKey.pem"
@@ -141,33 +141,22 @@ void wait_connections()
 	socklen_t addr_size, client_addr_size;
 	long long int t2;
 	long long int t3;
-	char t2_str[17];
-    	char t2_pps_str[17];
-	char t3_str[17];
-	char sig_s[65],sig_r[65];
-	char chain_tx[67+129],chain_tx_old[67+129];
-	char chain_rx[67+129];
-	memset(chain_tx_old,0,sizeof(chain_tx_old));
+	signed_ntp_packet packet,packet_old;
+	memset( &packet, 0, sizeof( ntp_packet ) );
+	memset( &packet_old, 0, sizeof( ntp_packet ) );
 
 	addr_size = sizeof serverStorage;
 	while(1){
-		nBytes = recvfrom(udpSocket,chain_rx,sizeof(chain_rx),0,(struct sockaddr *)&serverStorage, &addr_size);
+		nBytes = recvfrom(udpSocket,&packet,sizeof(packet),0,(struct sockaddr *)&serverStorage, &addr_size);
 		// Verify client signature
 		ECDSA_SIG sig;
-		// Validate signature
-		// sig.r
-		for(i=68;i<68+64;i++)  sig_r[i-68]=chain_rx[i];
-		sig_r[64]= '\0';
-		// sig.s
-		for(i=132;i<132+64;i++)  sig_s[i-132]=chain_rx[i];
-		sig_s[64]= '\0';
 		BIGNUM* r = BN_new();
 		BIGNUM* s = BN_new();
-		BN_hex2bn(&r, sig_r);
-		BN_hex2bn(&s, sig_s);
+		BN_bin2bn(packet.signature_r,sizeof(packet.signature_r),r);
+		BN_bin2bn(packet.signature_s,sizeof(packet.signature_s),s);
 		sig.s=s;
 		sig.r=r;
-		if (1 != ECDSA_do_verify(chain_rx, 67, &sig, clntkey)) {
+		if (1 != ECDSA_do_verify((char *)(&packet.ntp), sizeof(packet.ntp), &sig, clntkey)) {
 		        printf("Failed to verify Client EC Signature\n");
 			continue;
 		} else {
@@ -175,22 +164,17 @@ void wait_connections()
 			}
 
 		t2=get_timestamp();
-		snprintf(t2_str, sizeof(t2_str), "%lld", t2);
-		strncpy(chain_tx, strtok(chain_rx,"|"),sizeof(chain_tx));
-		strncat(chain_tx,"|",sizeof(chain_tx));
-		strncat(chain_tx,t2_str,sizeof(chain_tx));
-		strncat(chain_tx,"|",sizeof(chain_tx));
+		packet.ntp.T2Tm_s = t2/1000000ll;
+		packet.ntp.T2Tm_f = t2-packet.ntp.T2Tm_s;
 		t3=get_timestamp();
-		snprintf(t3_str, sizeof(t3_str),"%lld", t3);
-		strncat(chain_tx,t3_str,sizeof(chain_tx));
+		packet.ntp.T3Tm_s = t3/1000000ll;
+		packet.ntp.T3Tm_f = t3-packet.ntp.T3Tm_s;
 		// Sign the last packet message
-                ECDSA_SIG *signature = ECDSA_do_sign(chain_tx_old, strlen(chain_tx_old), eckey);
-		strncpy(chain_tx_old,chain_tx,sizeof(chain_tx_old));
-		strncat(chain_tx,"|",sizeof(chain_tx));
-		strncat(chain_tx,BN_bn2hex(signature->r),sizeof(chain_tx));
-		strncat(chain_tx,BN_bn2hex(signature->s),sizeof(chain_tx));
-		memset(chain_rx,'\0',strlen(chain_rx));
-		sendto(udpSocket,chain_tx,sizeof(chain_tx),0,(struct sockaddr *)&serverStorage,addr_size);
+                ECDSA_SIG *signature = ECDSA_do_sign((char *)(&packet_old.ntp), sizeof(packet_old.ntp), eckey);
+		memcpy(&packet_old.ntp,&packet.ntp,sizeof(packet_old.ntp));
+		BN_bn2bin(signature->r,packet.signature_r);
+		BN_bn2bin(signature->s,packet.signature_s);
+		sendto(udpSocket,&packet,sizeof(packet),0,(struct sockaddr *)&serverStorage,addr_size);
 	}
 
 }

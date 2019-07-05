@@ -42,7 +42,7 @@
 #include "aux.h"
 #include <unistd.h>
 #include <openssl/ecdsa.h>   // for ECDSA_do_sign, ECDSA_do_verify
-
+#include "../server/ntp-packet.h"
 typedef struct  
 { 
 	int epoch; 
@@ -308,27 +308,24 @@ int start_values()
 // Send and Receive data server //
 sic_data send_sic_packet(void)
 {
-
-	char chain_tx[67+129];
-	char chain_rx[67+129];
-	static char chain_rx_old[67+129];
-	char sig_s[65],sig_r[65];
-	char tx_str[52]= "|0000000000000000|0000000000000000|0000000000000000";
-	char t1_str[17];
-	char t4_str[17];
-	char t2_str_rec[17];
-	char t3_str_rec[17];
+	static signed_ntp_packet packet,packet_old;
+	char t1_str[17],t2_str_rec[17],t3_str_rec[17],t4_str[17];
 	sic_data out;
 	int flags, receive, i;
 	long long int t1, t4;	
 	int nBytes, validation, numfd;
 	fd_set readfds;
 	struct timeval tv;
+	static int packetold=0;
+
+	/* Populate packet struct */
+	memset( &packet, 0, sizeof( ntp_packet ) );
+	packet.ntp.li_vn_mode =0x28;  // li=0, vn=5,mode=0 00,101,000
 
 	if (flag_parameters == 0)
 		create_socket();	
 
-	// Conect to server //
+	/* Conect to server */
 	if ( connect( clientSocket, ( struct sockaddr * ) &serverAddr, sizeof( serverAddr) ) < 0 ) 
 	{
 		error( "Error: connecting socket" ); 
@@ -340,17 +337,16 @@ sic_data send_sic_packet(void)
 		to=true;	
 	}
 	
-	t1=get_timestamp();  
-	snprintf(t1_str, sizeof(t1_str), "%lld", t1);	
-	strncpy(chain_tx,t1_str,sizeof(chain_tx));
-	strncat(chain_tx,tx_str,sizeof(chain_tx));
+	t1=get_timestamp();
+	packet.ntp.T1Tm_s = t1/1000000ll;
+	packet.ntp.T1Tm_f = t1-packet.ntp.T1Tm_s;
+	snprintf(t1_str,sizeof(t1_str),"%llu",t1);
 	// Sign the last packet message
-        ECDSA_SIG *signature = ECDSA_do_sign(chain_tx, strlen(chain_tx), eckey);
-	strncat(chain_tx,"|",sizeof(chain_tx));
-	strncat(chain_tx,BN_bn2hex(signature->r),sizeof(chain_tx));
-	strncat(chain_tx,BN_bn2hex(signature->s),sizeof(chain_tx));
+        ECDSA_SIG *signature = ECDSA_do_sign(((char *)&packet.ntp), sizeof(packet.ntp), eckey);
+	BN_bn2bin(signature->r,packet.signature_r);
+	BN_bn2bin(signature->s,packet.signature_s);
 	// Send data to server //
-	if ( (i=sendto(clientSocket,chain_tx,sizeof(chain_tx),0,(struct sockaddr *)&serverAddr,addr_size)) < 0)
+	if ( (i=sendto(clientSocket,&packet,sizeof(packet),0,(struct sockaddr *)&serverAddr,addr_size)) < 0)
 	{
 		close(clientSocket);
 		error( "Error: sentto");
@@ -404,9 +400,9 @@ sic_data send_sic_packet(void)
 			{
 				// Get t4 //
 				t4=get_timestamp();
-				snprintf(t4_str, sizeof(t4_str), "%lld", t4);
+				snprintf(t4_str, sizeof(t4_str), "%llu", t4);
 				
-				nBytes = recvfrom(clientSocket,chain_rx,sizeof(chain_rx),0,NULL, NULL);
+				nBytes = recvfrom(clientSocket,&packet,sizeof(packet),0,NULL, NULL);
 				if (nBytes < 0)
 				{
 					error( "Error: recept data" );
@@ -424,29 +420,23 @@ sic_data send_sic_packet(void)
 				FD_CLR(clientSocket, &readfds);
 				
 				// Trim times //
-				for(i=17;i<33;i++)  t2_str_rec[i-17]=chain_rx[i];
-				t2_str_rec[16]= '\0';
-								
+				long long t2=packet.ntp.T2Tm_f+packet.ntp.T2Tm_s*1000000ll;
+				snprintf(t2_str_rec,sizeof(t2_str_rec),"%llu",t2);
 				// t3 //
-				for(i=34;i<51;i++)  t3_str_rec[i-34]=chain_rx[i];
-				t3_str_rec[16]= '\0';
+				long long t3=packet.ntp.T3Tm_f+packet.ntp.T3Tm_s*1000000ll;
+				snprintf(t3_str_rec,sizeof(t3_str_rec),"%llu",t3);
 
-				ECDSA_SIG sig;
 				// Validate server signature
-				// sig.r
-				for(i=51;i<51+64;i++)  sig_r[i-51]=chain_rx[i];
-				sig_r[64]= '\0';
-				// sig.s
-				for(i=115;i<115+64;i++)  sig_s[i-115]=chain_rx[i];
-				sig_s[64]= '\0';
+				ECDSA_SIG sig;
 				BIGNUM* r = BN_new();
 				BIGNUM* s = BN_new();
-				BN_hex2bn(&r, sig_r);
-				BN_hex2bn(&s, sig_s);
+				BN_bin2bn(packet.signature_r,sizeof(packet.signature_r),r);
+				BN_bin2bn(packet.signature_s,sizeof(packet.signature_s),s);
 				sig.s=s;
 				sig.r=r;
-				if (strlen(chain_rx_old)>0) {
-				if (1 != ECDSA_do_verify(chain_rx_old, 67, &sig, srvkey)) {
+			
+				if (packetold) {
+				if (1 != ECDSA_do_verify((char *)&packet_old.ntp, sizeof(packet_old.ntp), &sig, srvkey)) {
 				        printf("Failed to verify Server EC Signature\n");
 					// reset sync because of failed signature
 					out.epoch=t1/1000000;
@@ -459,8 +449,8 @@ sic_data send_sic_packet(void)
 				        printf("Verified Server EC Signature\n");
 					}
 					}
-				strncpy(chain_rx_old,chain_rx,sizeof(chain_rx_old));
-				
+				memcpy(&packet_old.ntp,&packet.ntp,sizeof(packet.ntp));
+				packetold=1;
 				// validate duplicate times //
 				validation=validate(t1_str, t2_str_rec, t3_str_rec, t4_str);
 				

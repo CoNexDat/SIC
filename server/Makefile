@@ -3,7 +3,7 @@
 #####################################################################
 
 OBJECTS = *.o
-BINARY = -o sic_server
+BINARY = sic_server
 
 ##################################################################### 
 #   Options 							#
@@ -18,7 +18,7 @@ CFLACS = -g -lssl -UOPENSSL_NO_EC
 
 all: sic_server
 
-sic_server: sic_server.c ecdsa.c
-	$(CC) $(CFLACS) $(BINARY) ecdsa.c sic_server.c -lcrypto
+sic_server: sic_server.c ecdsa.c ntp-packet.h
+	$(CC) $(CFLACS) -o $(BINARY) ecdsa.c sic_server.c -lcrypto
 clean:
 	rm -f $(BINARY) $(OBJECTS)
